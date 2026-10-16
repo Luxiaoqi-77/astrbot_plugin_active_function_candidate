@@ -1,0 +1,5 @@
+name: astrbot_plugin_active_function_candidate
+author: Codex
+desc: Isolated owner-scoped active-function adaptation candidate
+version: 0.1.0
+repo: local-candidate
