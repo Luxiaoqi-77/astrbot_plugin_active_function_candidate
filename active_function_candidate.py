@@ -15,8 +15,8 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.core.message.components import Plain, Reply
 from astrbot.core.message.message_event_result import MessageChain
 
-OWNER_UMO = "qq_napcat_2258780898:FriendMessage:2870791457"
-OWNER_SENDER_ID = "2870791457"
+OWNER_UMO = "qq_napcat_100000002:FriendMessage:100000001"
+OWNER_SENDER_ID = "100000001"
 _ACTIVE_REPLY_TAG = re.compile(r"\[reply:\d+\]", re.IGNORECASE)
 _CONTROL_TAG = re.compile(r"\[\s*(?:reply\s*:[^\]]*|recall|poke)\s*\]", re.I)
 _CONTROL_HEAD = re.compile(r"^\[\s*(?:reply|recall|poke)\b", re.I)

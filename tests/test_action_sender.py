@@ -43,7 +43,7 @@ class FakeEvent:
         return None
 
     def get_self_id(self) -> str:
-        return "2258780898"
+        return "100000002"
 
     def get_extra(self, key: str, default=None):
         return self.extras.get(key, default)
