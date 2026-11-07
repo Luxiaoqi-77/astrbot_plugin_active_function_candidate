@@ -17,6 +17,8 @@ from typing import Any
 
 from astrbot.api import logger
 from astrbot.core.message.components import Plain
+from astrbot.core.message.message_event_result import ResultContentType
+from data.plugins.xiaohui_control_mode import blocked as control_isolated
 
 from .active_function_candidate import OWNER_SENDER_ID, OWNER_UMO, is_owner_private_turn
 
@@ -446,7 +448,9 @@ async def _handle_target_action_decorate_once(plugin: Any, event: Any) -> bool:
     result = event.get_result()
     if result is None:
         return False
-    if event.get_extra("virtual_life_consciousness_sync") is True:
+    if getattr(result, "result_content_type", None) == ResultContentType.GENERAL_RESULT:
+        return False
+    if (event.get_extra("virtual_life_consciousness_sync") is True or control_isolated(event.unified_msg_origin)):
         return False
     if getattr(result, "async_stream", None) is not None:
         return False
@@ -489,6 +493,24 @@ async def _handle_target_action_decorate_once(plugin: Any, event: Any) -> bool:
     # Keep mixed text/media replies on the ordinary chain so images, records,
     # video and files preserve their existing order and transport behavior.
     if any(not isinstance(component, Plain) for component in getattr(result, "chain", ())):
+        if poke_tag and poke_tag in text and getattr(plugin, "poke_enable", False) is True:
+            bot = getattr(event, "bot", None)
+            if bot is None:
+                getter = getattr(plugin, "_get_bot_from_platform", None)
+                bot = getter(event) if callable(getter) else None
+            if bot is not None:
+                diagnostic = getattr(plugin, "_record_action_diagnostic", None)
+                if callable(diagnostic):
+                    diagnostic(
+                        event,
+                        stage="poke_parse",
+                        reason="mixed_chain_standalone",
+                        tag_count=text.count(poke_tag),
+                    )
+                try:
+                    await plugin._fire_poke(event, bot)
+                except (asyncio.CancelledError, Exception):
+                    logger.debug("[ActiveFunction] Mixed-chain poke did not complete")
         _clean_target_controls(result, text, plugin, event)
         return False
 

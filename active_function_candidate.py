@@ -13,7 +13,8 @@ from typing import Any
 
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.core.message.components import Plain, Reply
-from astrbot.core.message.message_event_result import MessageChain
+from astrbot.core.message.message_event_result import MessageChain, ResultContentType
+from data.plugins.xiaohui_control_mode import blocked as control_isolated
 
 OWNER_UMO = "qq_napcat_100000002:FriendMessage:100000001"
 OWNER_SENDER_ID = "100000001"
@@ -232,6 +233,8 @@ class ActiveFunctionCandidate:
         result = event.get_result()
         if result is None:
             return
+        if getattr(result, "result_content_type", None) == ResultContentType.GENERAL_RESULT:
+            return
 
         stream = getattr(result, "async_stream", None)
         streaming = stream is not None or bool(
@@ -253,7 +256,7 @@ class ActiveFunctionCandidate:
             strip_unhandled_control_tags(event)
             result.chain = [component for component in result.chain if not isinstance(component, Reply)]
 
-        if event.get_extra("virtual_life_consciousness_sync", False) is True:
+        if (event.get_extra("virtual_life_consciousness_sync", False) is True or control_isolated(event.unified_msg_origin)):
             event.set_extra("_active_func_actions_blocked", True)
             event.set_extra("_active_func_reply_blocked", True)
             event.set_extra("continuous_target_reply_controls", False)

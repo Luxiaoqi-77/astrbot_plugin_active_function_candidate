@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest import mock
 
-from astrbot.core.message.components import Plain
+from astrbot.core.message.components import Image, Plain, Reply
 from data.plugins.astrbot_plugin_active_function_candidate.action_sender import (
     ActionSegment,
     TurnRecallLedger,
@@ -254,6 +254,69 @@ def test_duplicate_decorator_entry_sends_and_pokes_once() -> None:
     assert plugin.sends[0][-1]["data"]["text"] == "A"
     assert plugin.pokes == 1
     assert event.clear_count == 1
+
+
+def test_mixed_chain_pokes_once_and_preserves_quote_and_media() -> None:
+    event = FakeEvent()
+    event.set_extra("_active_func_bridge_bound", True)
+    event.set_extra("_active_func_original_text", "A$[poke]B")
+    quote = Reply(id="123")
+    picture = Image.fromFileSystem("/offline/sticker.png")
+    event.result.chain = [quote, Plain("A$B"), picture]
+    plugin = FakePlugin()
+
+    async def scenario():
+        return await asyncio.gather(
+            handle_target_action_decorate(plugin, event),
+            handle_target_action_decorate(plugin, event),
+        )
+
+    assert asyncio.run(scenario()) == [False, False]
+    assert plugin.pokes == 1
+    assert plugin.sends == []
+    assert event.clear_count == 0
+    assert event.result.chain[0] is quote
+    assert event.result.chain[1].text == "A$B"
+    assert event.result.chain[2] is picture
+    assert "[poke]" not in event.get_extra("_active_func_original_text")
+
+
+def test_mixed_chain_respects_poke_gates() -> None:
+    for gate in ("disabled", "blocked", "unbound", "streaming", "sync"):
+        event = FakeEvent("A[poke]")
+        event.set_extra("_active_func_bridge_bound", gate != "unbound")
+        event.result.chain.append(Image.fromFileSystem("/offline/sticker.png"))
+        plugin = FakePlugin()
+        if gate == "disabled":
+            plugin.poke_enable = False
+        elif gate == "blocked":
+            event.set_extra("_active_func_actions_blocked", True)
+        elif gate == "streaming":
+            event.result.async_stream = object()
+        elif gate == "sync":
+            event.set_extra("virtual_life_consciousness_sync", True)
+        assert asyncio.run(handle_target_action_decorate(plugin, event)) is False
+        assert plugin.pokes == 0
+        assert plugin.sends == []
+        assert event.clear_count == 0
+
+
+def test_mixed_chain_failed_poke_keeps_dialogue_without_retry() -> None:
+    event = FakeEvent("A[poke]")
+    event.set_extra("_active_func_bridge_bound", True)
+    picture = Image.fromFileSystem("/offline/sticker.png")
+    event.result.chain.append(picture)
+    plugin = FakePlugin()
+    plugin._fire_poke = mock.AsyncMock(side_effect=RuntimeError("offline rejection"))
+
+    asyncio.run(handle_target_action_decorate(plugin, event))
+    asyncio.run(handle_target_action_decorate(plugin, event))
+
+    plugin._fire_poke.assert_awaited_once()
+    assert event.result.chain[0].text == "A"
+    assert event.result.chain[1] is picture
+    assert event.clear_count == 0
+    assert plugin.sends == []
 
 
 def test_recall_response_accepted_contract() -> None:

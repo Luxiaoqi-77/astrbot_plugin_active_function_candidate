@@ -8,6 +8,7 @@ from typing import Any
 
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
+from astrbot.core.message.message_event_result import ResultContentType
 from astrbot.core.provider.entities import ProviderRequest
 
 from .action_sender import handle_target_action_decorate
@@ -207,6 +208,11 @@ class ActiveFunctionCandidatePlugin(Star):
 
     @filter.on_decorating_result(priority=13)
     async def dispatch_target_actions(self, event: AstrMessageEvent) -> None:
+        if (
+            getattr(event.get_result(), "result_content_type", None)
+            == ResultContentType.GENERAL_RESULT
+        ):
+            return
         active = self._active_plugin()
         if active is not None and self._binding_complete and active is self._patched_active_plugin:
             await handle_target_action_decorate(active, event)
